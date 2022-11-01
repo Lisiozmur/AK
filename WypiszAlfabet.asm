@@ -1,0 +1,7 @@
+ORG 800H  
+	MVI A,65  
+ZNAK	RST 1  
+	INR A  
+	CPI 91  
+	JNZ ZNAK  
+HLT  

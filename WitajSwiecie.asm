@@ -1,0 +1,5 @@
+	 ORG 800H  
+	 LXI H,WIERSZ  
+	 RST 3  
+	 HLT  
+WIERSZ 	 DB 'WITAJ SWIECIE!!!@' 
