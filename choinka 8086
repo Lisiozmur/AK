@@ -1,0 +1,93 @@
+_code segment
+assume  cs:_code, ds:_data, ss:_stack      ;segmenty codu, danych i stosu
+
+start:	mov	ax,_data
+	mov	ds,ax
+	mov	ax,_stack
+	mov	ss,ax
+	mov	sp,offset top
+        
+	; your code goes here
+		
+		
+	mov     bp, 5       ;rejestr wskaznika bazy na spacje oraz cala ilosc petli
+    mov     bx, 1       ;na gwiazdki
+cale: 
+    call spac
+    mov     cx, bp      ;liczba spacji
+spacja:
+       
+    mov     ah, 02h    ;wypisuje znak ascii z rejetru dl
+    int     21h
+    loop    spacja
+ 
+    call znak
+    
+    mov     cx, bx      ; liczba gwiazdek
+gwiazdka:
+    
+    mov     ah, 02h
+    int     21h         ;przerwania 21h dotycza DOS'a
+    loop    gwiazdka
+
+   
+    mov     ah, 02h     
+    mov     dl, 0Ah      ;nowa linijka 
+    int     21h
+    mov     dl, 0Dh     ;poczatek linijki
+    int     21h
+
+    add     bx, 2       ; dodajee 2 gwiazdki
+    dec     bp          ; zmiejszenie ilosci spacji i tym samym liczby krokow
+    jnz     cale        ; dopoki nie bedzie BP = 0	
+	
+	
+
+	
+		
+	mov 	bp, 3		;ilosc lini
+cale2:
+    mov     cx, 5       ;spacje do lini	
+spacja2:
+    mov     dl, " "
+    mov     ah, 02h
+    int     21h
+    loop    spacja2
+         
+	mov		cx, 1		;gwiazdki
+gwiazdka2:
+    mov     dl, "*"
+    int     21h
+    mov     dl, 0Ah      ;nowa linijka 
+    int     21h
+    mov     dl, 0Dh     ;poczatek linijki
+    int     21h
+    loop    gwiazdka2
+	
+	dec bp
+	jnz cale2      ;do wyzerowania BP
+	
+	mov	ah,4ch     ; zakonczenie dzialania bierzacego problemu
+	mov	al,0      ;AL=0 oznacza zakonczenie bez bledow
+	int	21h
+	
+ znak:
+mov dl, "*"	
+RET	 
+
+spac:
+mov dl, " "
+RET
+	
+_code ends
+
+_data segment
+	; your data goes here   miejsce do deklarowania zmiennych
+_data ends
+
+_stack segment stack
+	dw	100h dup(0)        ;segment stosu
+top	Label word
+_stack ends
+
+end start     
