@@ -1,0 +1,9 @@
+org 800h
+waitkey:
+mov ah,6
+mov dl,255
+int 21h
+jz waitkey
+mov ah,6
+mov dl,al
+int 21h
