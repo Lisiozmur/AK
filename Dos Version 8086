@@ -1,0 +1,34 @@
+_code segment
+assume  cs:_code, ds:_data, ss:_stack
+
+start:	mov	ax,_data
+	mov	ds,ax
+	mov	ax,_stack
+	mov	ss,ax
+	mov	sp,offset top
+        
+	mov ah, 30h
+	int 21h
+	add al, '0'
+	mov ver, al
+	lea dx, prompt
+	mov ah,9
+	int 21h
+	
+		
+	mov	ah,4ch
+	mov	al,0
+	int	21h
+_code ends
+
+_data segment
+	prompt db "DOS Version "
+	ver db "?$"
+_data ends
+
+_stack segment stack
+	dw	100h dup(0)
+top	Label word
+_stack ends
+
+end 
