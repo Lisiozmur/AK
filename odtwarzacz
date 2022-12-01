@@ -1,0 +1,191 @@
+CODE       SEGMENT
+           ASSUME CS:CODE, DS:CODE
+		
+
+
+DO EQU 0 ; 'DO'
+RE EQU 2 ; 'RE'
+MI EQU 4 ; 'MI'
+FA EQU 6 ; 'FA'
+SOL EQU 8 ; 'SOL'
+RA EQU 0AH ; 'RA'
+SY EQU 0CH ; 'SY'
+DO1 EQU 0EH ; High 'DO'
+NO EQU 10H ; 'Soundless'
+FA1 EQU 12H
+MI1 EQU 14H
+RE1 EQU 16H
+RE1S EQU 18H
+SOL1 EQU 1AH
+SOL1B EQU 1CH
+SOLS EQU 1EH
+SYB EQU 20H
+RA1 EQU 22H
+DO11 EQU 24H
+
+       
+       
+START:     
+           MOV SP,4000H  ;designation of the space were the information will be stored with  stack pointer
+           MOV AX,CS     ; CS = DS, ES, SS the equalization of the code segment, data segment     
+           MOV DS,AX     ; and the stack segment let to the saving of the information in a closer section of the memory
+           MOV ES,AX
+           MOV SS,AX
+           MOV DX, 3FD6H ; Initializing the 8255  
+           MOV AL,80H    ; All PORT=Output
+           OUT DX,AL
+           MOV DX, 3FD4H ; adressing the port c on which is connected to the 
+           MOV AL,0FFH   ; Sending '1, HIGH'
+           OUT DX,AL
+           MOV DX, 0FFDEH ; Initializing the 8253, which is a counter
+           MOV AL,01110110B
+           OUT DX,AL
+        MOV DX,0FFEAH     ; initializing the 8279 in which is connected to the key board 
+         MOV AL,0
+         OUT DX,AL
+         MOV AL,39H 
+         OUT DX,AL
+
+ 
+BUTTON:  MOV DX,0FFEAH ; defining button for each song
+
+LOOP1:  IN AL,DX
+        TEST AL,7      ; addition of a test value to AL
+        JZ LOOP1
+ 
+        MOV DX,0FFE8H ; adreess to inidicate an intake from the key board which will be assigned to AL so it can be compared to 
+        IN AL,DX      ; determine to which song os the code going to jump to 
+        
+
+         CMP AL,01H   ; if the character enter from the key board is equal to 1 then 
+         JE FIRSTSONG ; jump into loop for song one
+
+         CMP AL,02H   ; if the character enter from the key board is equal to 2 then 
+         JE SECONSONG ; jump into loop for song two
+
+	 JNE LOOP1    ; if the input command is not ethir '1' or '2' key then it jumps again to loop1 
+
+
+FIRSTSONG:
+        MOV SI,OFFSET NAME ; recalls the letters from a data offset for song 1        
+        MOV BX,09H         ; the counter which will be used on the 'WHITENAE' fuction (the number assigned to BX is the total amount of letters plus spaces on the name)
+        CALL WRITENAE      ; calling the function to write o  the screen the name of the song  
+        JMP SONG1          ; after printing the name this jump takes the code to the segment where the program is going to obtain the data to play the song (frequencies and order of notes)
+
+SECONSONG:
+        MOV SI,OFFSET NAME2 ; recalls the letters from a data offset for song 2    
+        MOV BX,0BH          ; the counter which will be used on the 'WHITENAE' fuction 
+        CALL WRITENAE       ; calling the function to write o  the screen the name of the song  
+        JMP SONG2           ; after printing the name this jump takes the code to the segment where the program is going to obtain the data to play the song 
+
+
+        
+SONG1:  MOV DX, 0FFDAH      ; address of COUNT1 on the 8253
+
+PLAY:      MOV BX,OFFSET DATA1 ; Setup start address divider rate (the data offset that contains all the frequency information associated to the notes wish are to be counted as by BX)
+           MOV SI,OFFSET DATA2 ; Setup start address sound data (the proper order of the notes, which are assigned to the SI variable)
+           JMP MAIN            ; jump into main to play the music 
+
+SONG2:  MOV DX, 0FFDAH      ; address of  COUNT1 on the 8253
+
+PLAY2:     MOV BX,OFFSET DATA1 ; Setup start address divider rate (the data offset that contains all the frequency information associated to the notes wish are to be counted as by BX)
+           MOV SI,OFFSET DATA3 ; Setup start address sound data (the proper order of the notes, which are assigned to the SI variable)
+           JMP MAIN            ; jump into main to play the music
+
+
+MAIN:      MOV AL,[SI]    ; setting the 
+           CMP AL,0FFH    ; End of Data?
+           JZ BUTTON      ; so another character can be input
+           MOV AH,0       ; Clear AH
+           PUSH SI        ; Start address sound data store temporary to the Stack
+           MOV SI,AX      ; Variable Data transfer to SI
+           MOV AX,[BX+SI] ; Divider rate transfer to AX
+           OUT DX,AL      ; Low Byte of divider rate transfer to 8253 COUNT1
+           MOV AL,AH      ; High Byte of divider rate transfer to AL
+           OUT DX,AL      ; High Byte of divider rate transfer to 8253 COUNT1
+           POP SI         ; Find appointed Data of Sound in the Stack.
+           INC SI         ;
+           MOV AL,[SI]    ; Data of Rhythm transfer to AL
+
+J1:        CALL TIMER     ; calling the function to apply a delay on the code
+           DEC AL         ; Passed Time?
+           JNZ J1         ;
+           MOV AX,10      ; Data of Soundless(the rest) transfer to 8253
+           OUT DX,AL      ; cutting of sound in the repetition same sound.
+           MOV AL,AH
+           OUT DX,AL
+           MOV CX,0AFH    ; setting the time for the delay by adding more steps
+           LOOP $         ; time delay
+           INC SI         ;
+           JMP MAIN       ;
+
+
+TIMER:     MOV CX,2800H   ; time delay routine
+           LOOP $         ; (Basic Rhythm)
+           RET
+
+
+COMMAND:
+        MOV DX,0FFC1H
+        MOV AL,AH     ;this operation equalizes 2 register 
+        OUT DX,AL     ;
+        RET
+
+
+DATAWRITE:
+        MOV DX,0FFC5H  ;to initialize the LCD 
+        MOV AL,AH
+        OUT DX,AL
+        RET
+
+
+BUSY:
+        MOV DX,0FFC3H  ;command for reading from the screen checking if the screen parts are clean 
+BUSY1:
+        IN AL,DX
+        AND AL,80H
+        JNZ BUSY1
+        RET
+
+
+WRITENAE:MOV AH,01H     ; cleaning the screen section
+        CALL COMMAND
+        CALL BUSY
+
+        MOV AH,80H      ; printing the character of the name retreated from the data segment 
+        CALL COMMAND
+        CALL BUSY
+
+PRINT:
+        MOV AH,[SI]     ;the code is designated to print the 
+        CALL DATAWRITE
+        CALL BUSY
+        INC SI
+        DEC BX
+        JNZ PRINT
+        RET
+
+
+DATA1:     ; DO, RE, MI, FA, FA1, MI1, RE1, RE1S, SOL1, SOL1B, SOLS, SYB, RA1, DO11 
+DW 4697, 4184, 3728, 3519, 1758, 1862, 2090, 1974, 1566, 1659, 2959, 2635, 1395, 9388  ;we defined all the required notes for our songs
+           ; SOL, RA, SY, DO1, NO
+DW 3135, 2793, 2491, 2352, 10H
+
+; in this data segment the code for the frequency of every note is saved 
+
+DATA2: DB DO,1,DO,1,DO,1,SOL,4,DO1,4,DO,1,SY,1,RA,1,SOL,4,RE,2,DO,1,SY,1,DO,1,RA,4,RE,1,RE,1,RE,1,SOL,4
+DB RE,4,DO,1,SY,1,RA,1,SOL,4,RE,2,NO,4,RE,1,NO,2,MI,1,NO,2,FA,1,NO,2,SOL,1,NO,2,RA,1,NO,2,SY,1,NO,2,DO1,1,NO,2  ;notes for 1st song(star wars)
+DB 0FFH               ;finalizing code 
+
+
+DATA3: DB  MI1,2,MI1,4,MI1,2,NO,2,DO1,2,MI1,4,SOL1,8,SOL,8,DO1,2,NO,1,SOL,1,NO,2,MI,2,NO,1,RA,1,NO,1,SY,1,NO,1
+DB SYB,1,RA,2,SOL,2,MI1,2,SOL1,2,RA1,2,FA1,1,SOL1,1,NO,1,MI1,1,NO,1,DO1,1,RE1,1,SYB,1,NO,2,DO1,2,NO,1,SOL,1,NO,2
+DB MI,2,NO,1,RA,1,NO,1,SYB,1,NO,1,SYB,1,RA,2,SOL,2,MI1,2,SOL1,2,RA1,2,FA1,1,SOL1,1,NO,1,MI1,1,NO,1,DO1,1,RE1,1,SYB,1,NO,2,DO11,2  ;notes for the 2nd song(super mario)
+DB 0FFH     ;finalizing code     ;SUPER MARIO BROS
+
+NAME: DB 'S','T','A','R',' ','W','A','R','S' ;Characters to be use on screen for song one, in the proper order, are defined and loaded to be use with the "WRITENAE" fuction 
+
+NAME2: DB 'S','U','P','E','R',' ','M','A','R','I','O'  ;words are defined for lcd screen part
+
+CODE        ENDS
+            END START
