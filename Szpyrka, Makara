@@ -1,0 +1,162 @@
+_code segment
+assume  cs:_code, ds:_data, ss:_stack
+
+start:	
+      mov	ax,_data
+	  mov	ds,ax
+	  mov	ax,_stack
+	  mov	ss,ax
+	  mov   sp,offset top
+      
+      lea dx,napis  
+      call print    
+      mov suma,0    
+      mov si,0      
+      lea dx,max    
+      mov ah,0Ah    
+      int 21h       
+
+prog: mov bl,index
+      cmp bl,len    
+      jz wypisanie_bin
+      
+      mov dx,16
+      mov ax,suma
+      mul dx  
+      jc zle  
+      mov suma,ax
+      
+      mov dl, znaki[bx]  
+      sub dl,'0'
+      cmp dl,10
+      jc wartosc_cyfry
+
+      mov dl, znaki[bx]   
+      sub dl,'A'
+      cmp dl,6
+      jnc zle   
+      
+wartosc_litery: mov ax,suma
+      add ax,dx
+      add ax,10
+      mov suma,ax
+      jmp koniec_hex
+      
+wartosc_cyfry: mov ax,suma
+      add ax,dx
+      mov suma,ax       
+             
+koniec_hex: inc index
+      jmp prog     
+      
+wypisanie_bin: call printnl
+      mov ah,2
+      mov bx,suma
+      mov cx,16
+      
+kolejb: mov dl,'0'
+      rcl bx,1 
+      jnc omin
+      inc dl
+      
+omin: int 21h
+      loop kolejb 
+      call wynik
+      mov index,0
+      mov ch,0
+      
+prog_dec: mov cl,0
+      mov bh,0
+      mov bl,ch
+      mov dx,dziel1[bx]
+      mov bl,index
+      cmp bl,max
+      jz wypisanie_dec            
+            
+petla: mov ax,suma
+      sub ax,dx
+      jc popetli
+      inc cl
+      mov suma,ax
+      jmp petla
+
+popetli: add ch,2 
+      add cl,'0'
+      mov znaki[bx],cl
+      inc index
+      mov bl,index
+      jmp prog_dec
+          
+      mov dl, znaki[bx] 
+      sub dl,'0'
+      cmp dl,10
+      jnc zle
+      
+wartosc_cyfry_dec: mov ax,suma
+      add ax,dx
+      mov suma,ax       
+      jmp prog       
+
+wypisanie_dec: mov bl,max
+      dec bl
+      mov znaki[bx],'$'
+      mov ah,09         
+      lea dx,znaki
+      int 21h
+      
+      call printnl   
+      lea dx,koniec
+      call print
+      mov ah,4ch
+      int 21h
+            
+zle:  call printnl    
+      lea dx,error
+      call print
+      mov ah,4ch
+      int 21h
+
+wynik: call printnl
+      lea dx,wyn1k
+      call print
+      ret
+     
+print: mov ah,09h    
+      int 21h
+      ret
+      
+printnl:     mov ah,02h
+      mov dl,0Ah
+      int 21h
+      mov dl,0Dh
+      int 21h
+      ret      
+	
+_code ends
+
+_data segment
+             
+index       db    0     
+suma        dw    0
+max         db    6    
+len         db    ?     
+znaki       db    6 dup(0)   
+dziel1      dw    10000d
+dziel2      dw    1000d
+dziel3      dw    100d
+dziel4      dw    10d
+dziel5      dw    1d
+napis       db 10,13,'Liczba:  $'
+error       db 10,13,'ERROR$'
+koniec      db  10,13,'Koniec$'
+wyn1k        db 10,13,'Decymalna: $'
+dzielniki   dw    10000,1000,100,10,1
+
+_data ends
+
+_stack segment stack
+	dw	100h dup(0)
+top	Label word
+_stack ends
+
+end start
