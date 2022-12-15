@@ -1,0 +1,160 @@
+data segment
+    przywitanie db 0Dh,0Ah, "Liczba do przeliczenia: $"     ;0D <-powrot karetki, 0A <- enter
+    blad db 0Dh, 0Ah, "Blad$"
+    napisBin db 0Dh, 0Ah, "W kodzie binarnym: $"
+    napisDec db 0Dh, 0Ah, "W kodzie decymalnym: $"
+    buforString db 7 dup('$')    ;7 bajtow wypelnionych
+    buforWartosc dw 0
+    podstawy dw 0002h, 000Ah    ;jakie sa podstawy
+    ends
+
+stack segment
+    dw   128  dup(0)
+ends
+
+code segment
+start:
+    mov ax,data
+    mov ds,ax
+    mov es,ax
+         
+    lea dx, przywitanie
+    mov ah, 09h ;wypisanie stringa
+    int 21h  
+    mov ah,0Ah  ;przyjecie stringa
+    lea dx,buforString
+    mov buforString,5 ;ile znakow moze przyjac buforWartosc? 4 i miejsce na enter
+    int 21h  
+    
+    call walidacja
+    call zaladujWartosc
+    call piszBin       
+    call piszDec
+
+koniec:
+    mov ah,1
+    int 21h
+    mov ax,4c00h
+    int 21h
+   
+walidacja:
+    call poczatekStringa
+petlaWalidacji:
+    call porownaj
+    call kolejnyZnak
+    dec cl
+    jnz petlaWalidacji:
+    ret             
+    
+poczatekStringa:
+    mov ch,00h
+    mov cl,buforString[1] ;buforWartosc[1] ma w sobie ilosc przyjetych znakow
+    mov si,2
+    mov dl,buforString[si]
+      
+porownaj:
+    cmp dl,'0'
+    jl zleASCII
+    cmp dl,'f'
+    jg zleASCII
+    cmp dl,'9'
+    jle return
+    cmp dl,'a'
+    jge toUpper
+    cmp dl,'A'
+    jl zleASCII
+    cmp dl,'F'
+    jg zleASCII
+    ret    
+    
+zleASCII:
+    lea dx, blad
+    mov ah, 09h
+    int 21h
+    jmp koniec  
+        
+zaladujWartosc:
+    call poczatekStringa
+    mov bx,0
+zaladujPetla:
+    call ASCIINaWartosc
+    rol bx,4
+    add bx,ax   
+    call kolejnyZnak
+    dec cl
+    jnz zaladujPetla  
+    mov buforWartosc,BX
+    mov si,0
+    ret
+    
+ASCIINaWartosc:
+    cmp dl,'9'
+    jg literaNaWartosc
+    sub dl,'0'
+    mov ah,00h
+    mov al,dl
+    ret  
+literaNaWartosc:
+    sub dl,55 ;'A' - 55 = 10, 'B' - 55 = 11, (...)
+    mov ah,00h
+    mov al,dl
+    ret
+
+kolejnyZnak:
+    inc si
+    mov dl,buforString[si]
+    ret
+   
+toUpper:
+    sub dl,32        
+    mov buforString[si],dl
+    ret
+    
+pushnij:
+    mov DX,'$'
+    push DX ;dolar na stos zeby oddzielic wartosc
+    mov BX,podstawy[si]
+    mov AX,buforWartosc
+dzielSmol:
+    mov DX,0000h
+    div BX
+    push DX
+    cmp AX,0
+    jnz dzielSmol
+    add si,2 ;zmienia na kolejna podstawe
+    
+popnij:
+    pop DX
+    cmp dl,'$'
+    jz return
+    add dl,'0'
+    call piszZnak
+    jmp popnij
+    call piszDec
+    inc cl
+    jmp popnij
+    
+piszDec:
+    lea dx,napisDec
+    jmp wrzut
+    
+piszBin:
+    lea dx,napisBin 
+    jmp wrzut
+ 
+wrzut:
+    mov ah,09h
+    int 21h
+    jmp pushnij
+    
+piszZnak:
+    mov ah,02
+    int 21h
+    ret
+    
+return:
+    ret 
+       
+ends
+
+end start
