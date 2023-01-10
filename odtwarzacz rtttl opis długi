@@ -1,0 +1,339 @@
+data segment	
+    
+    welcome db 13,10,"*** Q/q --> Wolniej S/s --> Szybciej P/p --> Pauza  X/x --> Wyjscie ***$", 13, 10 ; wyświetla string  ztym tekstem na ekranie
+    odtwarzam db 'Odtwarzam plik: $' ; wyświetla ten tekst nma ekranie i dodatkowo nazwę pliku 
+    
+    filename	db 64 dup(0) ;Ta linia definiuje tablicę o nazwie „filename”, która będzie przechowywać nazwę pliku, który ma zostać otwarty.
+    dolar       db '$' ; Ta linia definiuje jednobajtowązmienną o nazwie "dolar" która zawierawartość ASCII znaku dolara który będzie używany do oznaczenia końca łańcucha
+	text		db 255 dup(0);Ta linia definiuje tablicę o nazwie „text”, która będzie używana do przechowywania zawartości pliku podczas jego czytania.
+	char		db ? ; Ta linia definiuje jednobajtową zmienną o nazwie „char”, która będzie używana do przechowywania każdego znaku odczytywanego z pliku.
+	line		db 255 dup(0);Ta linia definiuje tablicę o nazwie „line”, która będzie używana do przechowywania linii pliku podczas jego czytania.
+	filehandle	dw ? ;Ta zmienna będzie przechowywać uchwyt pliku zwrócony przez funkcję otwierającą plik.
+	readmode db 0 ;Ta linia definiuje jednobajtową zmienną o nazwie „tryb odczytu”, która będzie używana do przechowywania bieżącego stanu programu (odtwarzanie lub wstrzymanie).
+	
+	kolor db '0' ;Ta linia definiuje jednobajtową zmienną o nazwie „kolor”, która będzie używana do przechowywania koloru tekstu, który zostanie wydrukowany na ekranie.
+	czasPrzerwy dw 0004h ;Ta linia definiuje zmienną o nazwie "czasPrzerwy" jako słowo (2 bajty). Będzie utrzymywać opóźnienie (w milisekundach) między dwiema kolejnymi nutami. 	
+	freq    equ 1193180 ;Ta linia definiuje stałą o nazwie "freq" i inicjuje ją wartością 1193180. Ta wartość jest częstotliwością bazową używaną w programie. 
+	ekran   equ 80*25 ;Linia ta definiuje stałą o nazwie „ekran” i inicjuje ją wartością 2000, która reprezentuje całkowitą liczbę znaków na ekranie, czyli 25*80. 
+	nuty dw  freq/440, freq/493, freq/261, freq/293, freq/329, freq/349, freq/392, 1 ; Ta linia definiuje tablicę zwaną „nuty”, która zawiera częstotliwości różnych nut. Częstotliwość ta jest obliczana przez podzielenie częstotliwości podstawowej (1193180) przez standardową częstotliwość każdej nuty.
+    
+ends
+
+stack segment
+    dw  10 dup(0)
+    szczyt  Label word
+ends
+
+code segment  
+    assume  cs:code, ds:data, ss:stack
+start:
+        mov    ax,data ; Ta instrukcja ładuje wartość segmentu danych do rejestru AX. Jest to zwykle używane do ustawienia segmentu danych jako segmentu aktywnego dla programu. 
+        mov    ds,ax  ; Ta instrukcja kopiuje wartość z rejestru AX do rejestru DS. Spowoduje to ustawienie segmentu danych jako segmentu aktywnego.
+        mov    ax,stack ;Ta instrukcja ładuje wartość segmentu stosu do rejestru AX.
+        mov    ss,ax ;Ta instrukcja kopiuje wartość z rejestru AX do rejestru SS. Spowoduje to ustawienie segmentu stosu jako segmentu aktywnego.
+        mov    sp,offset szczyt ;Ta instrukcja kopiuje przesunięcie etykiety "szczyt" (które jest wierzchołkiem stosu) do rejestru SP. Spowoduje to ustawienie wskaźnika stosu na szczycie stosu.
+        
+
+        ;otwieranie pliku
+        ; load params from command line 
+        call ;fileParam Ta instrukcja przekazuje sterowanie do podprogramu o nazwie „fileParam”, ten podprogram służy do analizowania argumentów wiersza poleceń w celu uzyskania nazwy pliku
+        ; open file from parameters
+        
+		;Ta sekwencja instrukcji służy do wydrukowania napisu "Odtwarzam plik: " na ekranie
+		;„int 21h” jest wywołaniem przerwania do BIOS-u, z AH=9 jest to funkcja „Print String”. 'mov ah,9' ustawia numer funkcji w rejestrze AH a 'lead dx, odtwarzam' ładuje przesunięcie napisu "odtwarzam" w rejestrze DX.
+        mov ah, 9
+        lea dx, odtwarzam
+        int 21h
+		;***
+		;Ta instrukcja służy do drukowania nazwy pliku na ekranie, podobnie jak poprzednia instrukcja.
+        lea dx, filename
+        int 21h
+		;***
+		;Ta instrukcja służy do wydrukowania komunikatu powitalnego na ekranie, podobnie jak poprzednia instrukcja.
+        lea dx, welcome
+        int 21h
+		;***	
+          
+    open_file:
+    	lea dx, filename ; Ta instrukcja ładuje offset tablicy "filename" do rejestru DX. To jest lokalizacja nazwy pliku.
+    	mov al, 0 ; Ta instrukcja ładuje wartość 0 do rejestru AL. Ta wartość jest używana jako atrybut pliku do otwierania pliku (0 dla tylko do odczytu).
+    	mov ah, 3Dh ;Ta instrukcja ładuje wartość 3Dh do rejestru AH. Ta wartość jest numerem funkcji dla funkcji „otwierania pliku” przerwania BIOS 21h.
+    	int 21h ;Ta instrukcja służy do wywołania funkcji „otwierania pliku” przerwania BIOS 21h. Ta funkcja otwiera plik określony w rejestrze DX i zwraca uchwyt pliku w rejestrze AX.
+    	mov filehandle, ax ;Ta instrukcja kopiuje wartość z rejestru AX (uchwyt pliku) do zmiennej „uchwyt pliku”
+    	lea si, text;Ta instrukcja ładuje przesunięcie tablicy „tekstowej” do rejestru SI. Jest to lokalizacja, w której będzie przechowywana zawartość pliku.
+    	
+    
+    read_line:
+    	mov ah, 3Fh ;Ta instrukcja ładuje wartość 3Fh do rejestru AH. Ta wartość jest numerem funkcji dla funkcji „odczyt pliku” przerwania BIOS 21h.
+    	mov bx, filehandle ;Ta instrukcja kopiuje wartość zmiennej "filehandle" do rejestru BX. Ta wartość jest uchwytem otwartego pliku i jest używana jako argument funkcji odczytu
+    	lea dx, char ;Ta instrukcja ładuje offset zmiennej "char" do rejestru DX. Jest to lokalizacja, w której bieżący znak będzie przechowywany podczas odczytywania go z pliku 
+    	mov cx, 1 ;Ta instrukcja ładuje wartość 1 do rejestru CX. Ta wartość jest używana jako liczba bajtów do odczytania
+    	int 21h ;Ta instrukcja jest używana do wywołania funkcji „read file” przerwania BIOS 21h. Ta funkcja odczytuje pojedynczy znak z pliku określonego w BX i zapisuje go w rejestrze DX
+    	cmp ax, 0  ;Instrukcja ta porównuje wartość w rejestrze AX (liczbę bajtów odczytanych z pliku) z 0. Rejestr AX jest ustawiany na zero, jeśli osiągnięty został koniec pliku.
+    	je EO_file ;Ta instrukcja przeskakuje do etykiety „EO_file”, jeśli wynik poprzedniego porównania jest równy (je).
+    	mov al, char ;Ta instrukcja kopiuje wartość zmiennej "char" do rejestru AL.
+    	cmp al, 0ah     ;Instrukcja ta porównuje wartość w rejestrze AL z kodem ASCII dla wysuwu wiersza (0Ah).
+    	je LF	;Ta instrukcja przeskakuje do etykiety „LF”, jeśli wynik poprzedniego porównania jest równy (je).
+    	mov [si], al ;Ta instrukcja kopiuje wartość z rejestru AL do miejsca pamięci określonego przez rejestr SI. Spowoduje to zapisanie bieżącego znaku w tablicy „text”.
+    	inc si ;Ta instrukcja zwiększa wartość w rejestrze SI. Służy do przejścia do następnego elementu w tablicy „text”.
+    	jmp read_line ;Ta instrukcja przekazuje kontrolę do etykiety „read_line”. To powoduje, że program powraca do początku pętli odczytu, gdzie odczytany zostanie następny znak.
+    
+    EO_file:
+    	lea dx, text    ;Ta instrukcja ładuje offset tablicy "text" do rejestru DX.
+    	mov ah, 40h     ;Ta instrukcja ładuje wartość 40h do rejestru AH. Ta wartość jest numerem funkcji dla funkcji „print” przerwania BIOS 21h.
+    	mov cx, si      ;Ta instrukcja kopiuje wartość z rejestru SI do rejestru CX. Ta wartość to liczba znaków w tablicy „text”.
+    	sub cx, dx      ;Ta instrukcja odejmuje przesunięcie tablicy „tekstowej” (w rejestrze DX) od liczby znaków w tablicy (w rejestrze CX), aby uzyskać rzeczywistą liczbę znaków w buforze.
+
+    	mov bx, 1 ;Ta instrukcja ładuje wartość 1 do rejestru BX. Ta wartość jest używana jako miejsce docelowe dla funkcji drukowania (1 dla standardowego urządzenia wyjściowego, ekranu).
+  
+    	mov si,cx ;Ta instrukcja kopiuje wartość z rejestru DX (przesunięcie tablicy „tekstowej”) do rejestru SI. Spowoduje to zresetowanie rejestru SI tak, aby wskazywał początek tablicy „tekstowej”.
+    	mov text[si], '$' ;Ta instrukcja kopiuje wartość ASCII znaku dolara do pierwszego elementu tablicy „text”. Służy do oznaczania końca tekstu.
+    	jmp melodiaStart ;Ta instrukcja przenosi kontrolę do etykiety „melodiaStart”, która jest początkiem kodu odtwarzającego melodię.
+    	
+    LF:
+	    lea dx, text    ;Ta instrukcja ładuje offset tablicy "text" do rejestru DX.
+	    mov ah, 40h     ;Ta instrukcja ładuje wartość 40h do rejestru AH. Ta wartość jest numerem funkcji dla funkcji „print” przerwania BIOS 21h.
+	    mov cx, si      ;Ta instrukcja kopiuje wartość z rejestru SI do rejestru CX. Ta wartość to liczba znaków w tablicy „text”.
+	    sub cx, dx      ;Ta instrukcja odejmuje przesunięcie tablicy „tekstowej” (w rejestrze DX) od liczby znaków w tablicy (w rejestrze CX), aby uzyskać rzeczywistą liczbę znaków w buforze.
+        ;To get the actual number of chars in the buffer
+	    mov bx, 1 ;Ta instrukcja ładuje wartość 1 do rejestru BX. Ta wartość jest używana jako miejsce docelowe dla funkcji drukowania (1 dla standardowego urządzenia wyjściowego, ekranu).
+	    int 21h ;Ta instrukcja służy do wywołania funkcji „print” przerwania BIOS 21h. Ta funkcja wyświetla zawartość tablicy „text” na ekranie.
+	    mov si, dx      ;Ta instrukcja kopiuje wartość z rejestru DX (przesunięcie tablicy „tekstowej”) do rejestru SI. Spowoduje to zresetowanie rejestru SI tak, aby wskazywał początek tablicy „tekstowej”.
+	    jmp read_line ;Ta instrukcja przekazuje kontrolę do etykiety „read_line”, która jest początkiem pętli odczytu, w której odczytana zostanie następna linia z pliku.
+	    
+	melodiaStart:
+        
+	    xor si,si ;czyszczenie rejestrow
+        xor ax,ax ;czyszczenie rejestrow
+        xor bx,bx ;czyszczenie rejestrow
+        xor cx,cx ;czyszczenie rejestrow
+        xor dx,dx ;czyszczenie rejestrow
+    melodia:
+        mov dl,text[si] ;Ta instrukcja kopiuje wartość z miejsca pamięci określonego przez sumę przesunięcia tablicy „tekstowej” i wartości z rejestru SI do rejestru DL. Wartość w rejestrze DL jest używana jako indeks do wyszukiwania częstotliwości nut w tablicy „nuty”.
+        mov bl,dl ;Ta instrukcja kopiuje wartość z rejestru DL do rejestru BL. Rejestr BL będzie używany do porównania z różnymi znakami.
+        cmp bl,'$' ;Instrukcja ta porównuje wartość w rejestrze BL z wartością ASCII znaku dolara. Sprawdza, czy aktualnie przetwarzany znak jest końcem łańcucha.
+        je melodiaRestart ;Ta instrukcja przeskakuje do etykiety „melodiaRestart”, jeśli wynik poprzedniego porównania jest równy (je). Ma to na celu wznowienie melodii od początku po osiągnięciu końca struny.
+        cmp bl,'.' ;Ta instrukcja porównuje wartość w rejestrze BL z wartością ASCII znaku kropki. Sprawdza, czy aktualnie przetwarzany znak jest pauzą.
+	    je pauza ;Ta instrukcja przeskakuje do etykiety "pauza", jeśli wynik poprzedniego porównania jest równy (je). Ma to na celu wstawienie pauzy w melodii.
+	    sub bl,'A' ;ta instrukcja odejmuje wartość ASCII „A” z rejestru BL.
+	    mov kolor,bl ;ta instrukcja kopiuje wartość z rejestru BL do zmiennej kolor.
+        shl kolor,4 ;ta instrukcja przesuwa wartość koloru o 4 w lewo
+        add kolor,7 ;ta instrukcja dodaje wartość 7 do zmiennej kolor
+	main:
+	    call color ;Ta instrukcja wywołuje podprogram „kolor”. Ta procedura jest prawdopodobnie używana do zmiany koloru tła ekranu.
+	    call graj ;Ta instrukcja wywołuje podprogram „graj”. Wygląda na to, że ten podprogram służy do odtwarzania nuty odpowiadającej aktualnie przetwarzanemu znakowi w tablicy „text”.
+        call checkKey ;Ta instrukcja wywołuje podprogram „checkKey”. Jest prawdopodobnie używany do sprawdzania danych wprowadzonych przez użytkownika i reagowania na nie, na przykład zwiększania/zmniejszania tempa, wstrzymywania lub zamykania programu.
+	    inc si ;Ta instrukcja zwiększa wartość w rejestrze SI. Spowoduje to aktualizację indeksu aktualnie przetwarzanego znaku w tablicy „text”.
+	    jmp melodia ;Ta instrukcja przenosi kontrolę do etykiety „melodia”, która jest początkiem pętli odtwarzania melodii.
+	pauza:
+	    mov bl,7 ;Ta instrukcja ładuje wartość 7 do rejestru BL.
+        jmp main ;Ta instrukcja przenosi kontrolę do „głównej” wytwórni, która jest kontynuacją pętli grającej melodię.
+	   
+    melodiaRestart:
+       mov BX,7 ;Ta instrukcja ładuje wartość 7 do rejestru BX.
+	   call graj ;Ta instrukcja ładuje wartość 7 do rejestru BX.
+	   call graj ;
+	   jmp  ;melodiaStart Ta instrukcja przekazuje kontrolę do etykiety „melodiaStart”, która jest początkiem pętli odtwarzania melodii i ponownie uruchamia melodię.   
+	 
+	;koniec programu   
+	koniec:
+	    mov kolor,7 ;Ta instrukcja ładuje wartość 7 do zmiennej kolor.
+        call color ;Ta instrukcja wywołuje podprogram „kolor”, ustawia kolor tła.
+        mov    ah,4Ch ;Ta instrukcja ładuje wartość 4Ch do rejestru AH. Ta wartość jest używana jako numer funkcji dla instrukcji „int 21h”, która służy do zakończenia programu.
+        mov    al,00h ;Ta instrukcja ładuje wartość 00h do rejestru AL. Ta wartość jest używana jako kod zakończenia programu.
+        int    21h ;Ta instrukcja generuje wywołanie przerwania do systemu operacyjnego MS-DOS. Numer funkcji w rejestrze AH określa, które wywołanie systemowe ma zostać wykonane. W tym przypadku jest to funkcja 4Ch, która kończy działanie programu i zwraca sterowanie do systemu operacyjnego.
+    	
+    ;malowanie tla
+    color:
+        push ax ;zapisz aktualną wartość rejestru AX na stosie
+        push cx ;zapisz aktualną wartość rejestru CX na stosie
+        push dx ;zapisz aktualną wartość rejestru DX na stosie
+        mov di,1 ;;przenieś wartość 1 do rejestru DI
+        mov ax,0B800h ;segment ekranu
+        mov ES,AX ;przenieś wartość AX do rejestru ES
+        MOV CX,ekran ;przenieś wartość ekranu do rejestru CX, ekran zawiera numer znaku na ekranie
+        LEA BP, Kolor ;Załaduj efektywny adres koloru do BP, jest to tablica zawierająca kod koloru.
+    fillLoop:
+        MOV AL, byte ptr DS:[BP] ;przenieś wartość tablicy kolorów do rejestru AL
+        MOV byte ptr ES:[DI], AL ;przenieś wartość AL na adres pamięci ES:DI, zmieni to kolor ekranu.
+        ADD DI, 2	;dodaj 2 do rejestru DI, spowoduje to przeniesienie adresu pamięci do następnego kodu atrybutu w pamięci VGA.
+        LOOP fillLoop ;wykonaj instrukcję fillloop, aż CX = 0
+        pop dx ;przywróć poprzednią wartość dx ze stosu
+        pop cx ;przywróć poprzednią wartość cx ze stosu
+        pop ax ;przywróć poprzednią wartość topora ze stosu
+        ret
+    	
+    graj:    
+        ;store current values        
+        push si
+        push cx
+        push AX
+        push DX
+                
+        ;wypisywanie aktualnej nuty
+        mov  cx,bx
+        mov  ch,00h
+        mov  si,cx
+        shl  si,1 
+        
+        push BX
+        
+     
+      	MOV AX, nuty[si]
+        MOV CX, czasPrzerwy	
+        MOV DX, 8480h
+    
+        MOV BX, AX          ; 1) Preserve the note value by storing it in BX.
+        MOV AL, 182         ; 2) Set up the write to the control word register.
+        OUT 43h, AL         ; 2) Perform the write.
+        MOV AX, BX          ; 2) Pull back the frequency from BX.
+        OUT 42h, AL         ; 2) Send lower byte of the frequency.
+        MOV AL, AH          ; 2) Load higher byte of the frequency.
+        OUT 42h, AL         ; 2) Send the higher byte.
+        IN AL, 61h          ; 3) Read the current keyboard controller status.
+        OR AL, 03h          ; 3) Turn on 0 and 1 bit, enabling the PC speaker gate and the data transfer.
+        OUT 61h, AL         ; 3) Save the new keyboard controller status.
+        MOV AH, 86h         ; 4) Load the BIOS WAIT, int15h function AH=86h.
+        INT 15h             ; 4) Immediately interrupt. The delay is already in CX:DX.
+        IN AL, 61h          ; 5) Read the current keyboard controller status.
+        AND AL, 0FCh        ; 5) Zero 0 and 1 bit, simply disabling the gate.
+        OUT 61h, AL         ; 5) Write the new keyboard controller status.
+        
+               
+        POP BX        
+        POP DX
+        POP AX
+        POP CX
+        POP SI
+        ret                 ; Epilog: Return.
+        
+        ;sprawdzanie klawiszy
+        
+    checkKey PROC              ; ARG di: pointer for restart
+        mov ah, 1               ; Check keyboard
+        int 16h
+        jz @@done               ; No key -> return
+        mov ah, 0               ; Get key
+        int 16h
+    
+        @@K0:                   ; Pause
+        cmp al, 'p'
+        jne @@K1
+        call @@pause
+        @@K1:
+        cmp al, 'P'
+        jne @@K2
+        @@pause:
+        mov bx,7
+        call graj
+        mov ah, 1               ; Check keyboard
+        int 16h
+        jz @@pause               ; No key -> return
+        mov ah, 0               ; Get key
+        int 16h
+        jmp @@done
+    
+        @@K2:                   ; Exit
+        cmp al, 'x'
+        je @@exit
+        cmp al, 'X'
+        jne @@K3
+        @@exit:
+        jmp koniec
+    
+        @@K3:                   ; Restart
+        cmp al, 's'
+        je @@szybciej
+        cmp al, 'S'
+        jne @@K4
+        @@szybciej:
+        push ax
+        mov ax,czasPrzerwy
+        cmp ax,1
+        je @@tooFast
+        sub ax,1
+        mov czasPrzerwy,AX
+        @@tooFast:
+        pop AX
+        jmp @@done
+
+        @@K4:                   ; Restart
+        cmp al, 'q'
+        je @@wolniej
+        cmp al, 'Q'
+        jne @@done
+        @@wolniej:
+        push ax
+        mov ax,czasPrzerwy
+        inc ax
+        mov czasPrzerwy,AX                  ; Placeholder for further key checks
+        pop ax
+        
+        @@done:
+        ret
+    checkKey ENDP
+    
+    ;ladowanie pliku po nazwie
+    
+    fileParam proc near      
+        lea di, filename
+        xor bx, bx            
+    nameparam:
+        call readnext
+        mov al, char[0]
+        cmp al, 13d
+        je endcmlparam
+        cmp al, ' '
+        jne writetoname        
+    endcmlparam: 
+        ret
+    writetoname:   
+        mov [bx+di-1], al 
+        jmp nameparam            
+    fileParam endp    
+    
+    
+    ;czytanie inputu
+    
+    readnext proc near
+        ; reads next char im w/e mode and stores it in char[0]
+        cmp readmode[0], 0
+        je cmlread
+        
+        ; file read 
+        push ax
+        push bx
+        push cx
+        push dx
+        
+        mov bx, filehandle
+        lea dx, char 
+        mov ah, 3Fh           
+        mov cx, 1     
+        int 21h
+        cmp ax, 0
+        je eof
+    
+    returnreadnext:    
+        pop dx
+        pop cx
+        pop bx
+        pop ax
+        ret
+    eof:
+        mov char[0], 0
+        jmp returnreadnext    
+    cmlread:
+        push ax
+        mov al, es:[bx+82h]
+        mov char[0], al
+        inc bx
+        pop ax
+        ret     
+            
+    readnext endp
+    
+  
+ends
+
+end start ; set entry point and stop the assembler.
