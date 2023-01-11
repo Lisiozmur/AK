@@ -1,0 +1,317 @@
+data segment	
+    
+    welcome db 13,10,"*** W/w --> Wolniej, S/s --> Szybciej, P/p --> Pauza  X/x --> Wyjscie ***$", 13, 10
+    odtwarzam db 'Odtwarzam plik: $'
+    
+    filename	db 64 dup(0)
+    dolar       db '$'
+	text		db 255 dup(0)
+	char		db ?
+	line		db 255 dup(0)
+	filehandle	dw ?
+	readmode db 0
+	
+	kolor db '0'
+	czasPrzerwy dw 0004h	
+	freq    equ 1193180
+	ekran   equ 80*25
+	nuty dw  freq/440, freq/493, freq/261, freq/293, freq/329, freq/349, freq/392, 1
+    
+ends
+
+stack segment
+    dw  10 dup(0)
+    szczyt  Label word
+ends
+
+code segment  
+    assume  cs:code, ds:data, ss:stack
+start:
+        mov    ax,data 
+        mov    ds,ax 
+        mov    ax,stack 
+        mov    ss,ax 
+        mov    sp,offset szczyt 
+        
+        call fileParam
+        
+        mov ah, 9
+        lea dx, odtwarzam
+        int 21h    
+        lea dx, filename
+        int 21h
+        lea dx, welcome
+        int 21h        
+          
+    open_file:
+    	lea dx, filename
+    	mov al, 0
+    	mov ah, 3Dh      
+    	int 21h
+    	mov filehandle, ax
+    	lea si, text
+    
+    read_line:
+    	mov ah, 3Fh      
+    	mov bx, filehandle
+    	lea dx, char
+    	mov cx, 1
+    	int 21h
+    	cmp ax, 0       
+    	je EO_file
+    	mov al, char
+    	cmp al, 0ah     
+    	je LF
+    	mov [si], al
+    	inc si
+    	jmp read_line
+    
+    EO_file:
+    	lea dx, text    
+    	mov ah, 40h     
+    	mov cx, si      
+    	sub cx, dx      
+    	mov bx, 1
+    	;int 21h  
+    	mov si,cx
+    	mov text[si], '$'
+    	jmp melodiaStart 
+    	
+    LF:
+	    lea dx, text    
+	    mov ah, 40h     
+	    mov cx, si     
+	    sub cx, dx      
+	    mov bx, 1
+	    int 21h
+	    mov si, dx      
+	    jmp read_line
+	    
+	melodiaStart:
+        
+	    xor si,si 
+        xor ax,ax
+        xor bx,bx
+        xor cx,cx
+        xor dx,dx 
+    melodia:
+        mov dl,text[si]
+        mov bl,dl
+        cmp bl,'$'
+        je melodiaRestart
+        cmp bl,'.'
+	    je pauza
+	    sub bl,'A'
+	    mov kolor,bl
+        shl kolor,4
+        add kolor,7
+	main:
+	    call color
+	    call graj
+        call checkKey
+	    inc si
+	    jmp melodia
+	pauza:
+	    mov bl,7
+        jmp main
+	   
+    melodiaRestart:
+       mov BX,7
+	   call graj
+	   call graj
+	   jmp  melodiaStart      
+	   
+	koniec:
+	    mov kolor,7
+        call color 
+        mov    ah,4Ch 
+        mov    al,00h 
+        int    21h
+    	
+    ;malowanie tla
+    color:
+        push ax
+        push cx
+        push dx
+        mov di,1
+        mov ax,0B800h 
+        mov ES,AX
+        MOV CX,ekran
+        LEA BP, Kolor
+    fillLoop:
+        MOV AL, byte ptr DS:[BP]
+        MOV byte ptr ES:[DI], AL
+        ADD DI, 2			
+        LOOP fillLoop
+        pop dx
+        pop cx
+        pop ax
+        ret
+    	
+    graj:           
+        push si
+        push cx
+        push AX
+        push DX
+                
+        mov  cx,bx
+        mov  ch,00h
+        mov  si,cx
+        shl  si,1 
+        
+        push BX
+        
+     
+      	MOV AX, nuty[si]
+        MOV CX, czasPrzerwy	
+        MOV DX, 8480h
+    
+        MOV BX, AX          
+        MOV AL, 182         
+        OUT 43h, AL         
+        MOV AX, BX          
+        OUT 42h, AL         
+        MOV AL, AH          
+        OUT 42h, AL         
+        IN AL, 61h          
+        OR AL, 03h          
+        OUT 61h, AL        
+        MOV AH, 86h        
+        INT 15h             
+        IN AL, 61h          
+        AND AL, 0FCh        
+        OUT 61h, AL         
+        
+               
+        POP BX        
+        POP DX
+        POP AX
+        POP CX
+        POP SI
+        ret                 
+        
+    checkKey PROC              
+        mov ah, 1               
+        int 16h
+        jz @@done               
+        mov ah, 0               
+        int 16h
+    
+        @@K0:                  
+        cmp al, 'p'
+        jne @@K1
+        call @@pause
+        @@K1:
+        cmp al, 'P'
+        jne @@K2
+        @@pause:
+        mov bx,7
+        call graj
+        mov ah, 1               
+        int 16h
+        jz @@pause               
+        mov ah, 0               
+        int 16h
+        jmp @@done
+    
+        @@K2:                   
+        cmp al, 'x'
+        je @@exit
+        cmp al, 'X'
+        jne @@K3
+        @@exit:
+        jmp koniec
+    
+        @@K3:                   
+        cmp al, 's'
+        je @@szybciej
+        cmp al, 'S'
+        jne @@K4
+        @@szybciej:
+        push ax
+        mov ax,czasPrzerwy
+        cmp ax,1
+        je @@tooFast
+        sub ax,1
+        mov czasPrzerwy,AX
+        @@tooFast:
+        pop AX
+        jmp @@done
+
+        @@K4:                   
+        cmp al, 'w'
+        je @@wolniej
+        cmp al, 'W'
+        jne @@done
+        @@wolniej:
+        push ax
+        mov ax,czasPrzerwy
+        inc ax
+        mov czasPrzerwy,AX                 
+        pop ax
+        
+        @@done:
+        ret
+    checkKey ENDP
+    
+    
+    fileParam proc near      
+        lea di, filename
+        xor bx, bx            
+    nameparam:
+        call readnext
+        mov al, char[0]
+        cmp al, 13d
+        je endcmlparam
+        cmp al, ' '
+        jne writetoname        
+    endcmlparam: 
+        ret
+    writetoname:   
+        mov [bx+di-1], al 
+        jmp nameparam            
+    fileParam endp    
+    
+    
+    
+    readnext proc near
+        cmp readmode[0], 0
+        je cmlread
+        
+        ; file read 
+        push ax
+        push bx
+        push cx
+        push dx
+        
+        mov bx, filehandle
+        lea dx, char 
+        mov ah, 3Fh           
+        mov cx, 1     
+        int 21h
+        cmp ax, 0
+        je eof
+    
+    returnreadnext:    
+        pop dx
+        pop cx
+        pop bx
+        pop ax
+        ret
+    eof:
+        mov char[0], 0
+        jmp returnreadnext    
+    cmlread:
+        push ax
+        mov al, es:[bx+82h]
+        mov char[0], al
+        inc bx
+        pop ax
+        ret     
+            
+    readnext endp
+    
+  
+ends
+
+end start 
