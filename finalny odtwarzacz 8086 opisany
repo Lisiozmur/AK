@@ -183,21 +183,21 @@ start:
         MOV CX, czasPrzerwy	
         MOV DX, 8480h
     
-        MOV BX, AX          ; 1) Preserve the note value by storing it in BX.
-        MOV AL, 182         ; 2) Set up the write to the control word register.
-        OUT 43h, AL         ; 2) Perform the write.
+        MOV BX, AX          ; 1) Zachowaj wartość nuty, przechowując ją w BX.
+        MOV AL, 182         ; 2) Skonfiguruj zapis do rejestru słów kontrolnych.
+        OUT 43h, AL         ; 2) Wykonaj zapis.
         MOV AX, BX          ; 2) Pull back the frequency from BX.
-        OUT 42h, AL         ; 2) Send lower byte of the frequency.
-        MOV AL, AH          ; 2) Load higher byte of the frequency.
-        OUT 42h, AL         ; 2) Send the higher byte.
-        IN AL, 61h          ; 3) Read the current keyboard controller status.
-        OR AL, 03h          ; 3) Turn on 0 and 1 bit, enabling the PC speaker gate and the data transfer.
-        OUT 61h, AL         ; 3) Save the new keyboard controller status.
-        MOV AH, 86h         ; 4) Load the BIOS WAIT, int15h function AH=86h.
-        INT 15h             ; 4) Immediately interrupt. The delay is already in CX:DX.
-        IN AL, 61h          ; 5) Read the current keyboard controller status.
-        AND AL, 0FCh        ; 5) Zero 0 and 1 bit, simply disabling the gate.
-        OUT 61h, AL         ; 5) Write the new keyboard controller status.
+        OUT 42h, AL         ; 2) Wycofaj częstotliwość z BX.
+        MOV AL, AH          ; 2) Załaduj wyższy bajt częstotliwości.
+        OUT 42h, AL         ; 2) Wyślij wyższy bajt.
+        IN AL, 61h          ; 3) Odczytaj aktualny stan kontrolera klawiatury.
+        OR AL, 03h          ; 3) Włącz 0 i 1 bit, włączając bramkę głośnika PC i transfer danych.
+        OUT 61h, AL         ; 3) Zapisz nowy stan kontrolera klawiatury.
+        MOV AH, 86h         ; 4) Załaduj BIOS CZEKAJ, funkcja int15h AH=86h.
+        INT 15h             ; 4) Natychmiast przerwać. Opóźnienie jest już w CX:DX.
+        IN AL, 61h          ; 5) Odczytaj aktualny stan kontrolera klawiatury.
+        AND AL, 0FCh        ; 5) Zero 0 i 1 bit, po prostu wyłączenie bramki.
+        OUT 61h, AL         ; 5) Napisz nowy status kontrolera klawiatury.
         
                
         POP BX        
@@ -291,30 +291,7 @@ start:
         mov [bx+di-1], al  ;Skopiuj wartość z AL do bufora w miejscu określonym przez BX+DI-1
         jmp nameparam  ;skok do etykiety nameparam       
     fileParam endp    
-    
-    parametr nazwy:
         
-        zadzwoń czytaj dalej
-        
-        mov al, char[0]
-        ;Porównaj wartość w AL z 13d (Powrót karetki)
-        cmp al, 13d
-        
-        je endcmlparam
-        
-        cmp al, ''
-        
-        jne napisznazwa
-    parametr_endcml:
-        ;Powrót z zabiegu
-        gnić
-    napisznazwa:
-        
-        ruch [bx+di-1], al
-        
-        parametr nazwy jmp
-    fileParam endp
-    
     ;czytanie inputu
     
     readnext proc near
